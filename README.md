@@ -1,98 +1,89 @@
 # Research Agent
 
-An autonomous research agent built with [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview.md).
+Autonomous research agents built with [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview.md).
 
-Given a topic, the agent:
-1. Searches the web autonomously (multiple queries)
-2. Fetches and reads relevant pages
-3. Writes a structured Markdown report
-4. Commits and pushes the report to a GitHub repository
+## Projects
+
+### 1. Generic Research Report (`run.py`)
+
+Given a topic, one agent searches the web and pushes a Markdown report to GitHub.
+
+```bash
+python run.py "AI Agent market landscape 2025" josecookai/research-reports main
+```
+
+### 2. AGI Economic Impact — Red/Blue Team Debate (`agi_debate/`)
+
+**Multi-agent orchestration**: 4 specialized agents collaborate across 6 phases:
+
+```
+Phase 1  Researcher      1 session   — 20+ web searches across economic literature
+Phase 2  Opening Args    2 parallel  — Blue Team (optimist) vs Red Team (pessimist)
+Phase 3  Rebuttals       2 parallel  — Each team counters the other's arguments
+Phase 4  Closing         2 parallel  — Cross-examination + probability estimates
+Phase 5  Synthesis       1 session   — Final comprehensive report (~5,000 words)
+Phase 6  Push                        — git commit + push to GitHub
+```
+
+**Topics covered:** unemployment scenarios, GDP projections, social unrest risk, US stock market (top 10 winners + losers).
+
+```bash
+# One-time: create the 4 agents
+python agi_debate/setup.py
+
+# Run the full debate + push report
+python agi_debate/orchestrate.py
+```
+
+Reports land in `reports/agi-debate-YYYY-MM-DD/`.
 
 ## How It Works
 
-Uses the **Anthropic Managed Agents API** — Anthropic hosts the agent loop and a sandboxed container where tools run. The agent autonomously decides when to search, fetch, write, and push.
+Uses the **Anthropic Managed Agents API** — Anthropic hosts the agent loop and provisions a sandboxed container per session where tools execute autonomously.
 
 ```
-Your Script → Session → Agent Loop (Anthropic) → Container (bash, web_search, git)
-                                                       ↓
-                                               GitHub Repository
+Orchestrator (your script)
+    │
+    ├─ Session 1: Researcher ──► web_search × 20 ──► research_brief.md
+    │
+    ├─ Session 2: Blue Team ──┐  (parallel)
+    ├─ Session 3: Red Team  ──┘  web_search + structured argument
+    │
+    ├─ Session 4: Blue Team ──┐  (parallel, given opponent's Round 1)
+    ├─ Session 5: Red Team  ──┘
+    │
+    ├─ Session 6: Blue Team ──┐  (parallel, full debate context)
+    ├─ Session 7: Red Team  ──┘
+    │
+    └─ Session 8: Synthesizer ──► agi_impact_report.md ──► git push
 ```
 
 ## Setup
 
-### 1. Install dependencies
-
 ```bash
 pip install -r requirements.txt
-```
-
-### 2. Configure environment
-
-```bash
 cp .env.example .env
-# Edit .env: add ANTHROPIC_API_KEY and GITHUB_TOKEN
+# fill in ANTHROPIC_API_KEY and GITHUB_TOKEN
 ```
 
-`GITHUB_TOKEN` requires a GitHub PAT with **Contents: Read+Write** permission.
+## File Structure
 
-### 3. Create the Agent (one-time)
-
-```bash
-python setup.py
-```
-
-This creates a persistent Agent and Environment on Anthropic's platform and saves their IDs to `.env`.
-
-### 4. (Optional) Set up GitHub MCP for PR creation
-
-```bash
-# Set GITHUB_MCP_ACCESS_TOKEN, GITHUB_MCP_REFRESH_TOKEN, etc. in .env first
-python vault_setup.py
-```
-
-Only needed if you want the agent to create Pull Requests (not just push commits).
-
-## Usage
-
-```bash
-python run.py "<research topic>" <owner/repo> [branch]
-```
-
-**Examples:**
-
-```bash
-# Research a topic and push report to your repo
-python run.py "AI Agent market landscape 2025" josecookai/research-reports main
-
-# Chinese topic
-python run.py "2025年 Rust vs Go 生态对比" josecookai/research-reports main
-```
-
-The report will be saved to `reports/report.md` in the target repository.
-
-## Architecture
-
-| File | Purpose |
-|---|---|
-| `setup.py` | One-time: create Agent + Environment, save IDs |
-| `vault_setup.py` | One-time (optional): store GitHub OAuth for MCP |
-| `run.py` | Per-task: create Session, stream events, push report |
-| `.env` | API keys and resource IDs |
-
-## Tools Used
-
-| Tool | Purpose |
-|---|---|
-| `web_search` | Find relevant articles and data |
-| `web_fetch` | Read full page content |
-| `write` | Save the Markdown report to disk |
-| `bash` | Run `git add`, `git commit`, `git push` |
-| GitHub MCP `create_pull_request` | (optional) Open a PR |
+| Path | Purpose |
+|------|---------|
+| `setup.py` | One-time: create generic research agent |
+| `run.py` | Per-task: single-agent research + push |
+| `vault_setup.py` | Optional: GitHub OAuth for PR creation |
+| `agi_debate/setup.py` | One-time: create 4 AGI debate agents |
+| `agi_debate/orchestrate.py` | Run full 8-session debate pipeline |
+| `agi_debate/utils.py` | `run_session()` helper |
+| `reports/` | Generated debate reports (pushed to GitHub) |
 
 ## Why Managed Agents?
 
-Unlike the standard Messages API, Managed Agents:
-- Run the agent loop server-side (no while loop in your code)
-- Provision a real container per session (file system, bash, git)
-- Handle context compaction and prompt caching automatically
-- Support long-running tasks without timeout concerns
+| Capability | Messages API | Managed Agents |
+|---|---|---|
+| Agent loop | Write your own | Built-in |
+| Tool execution | Handle manually | Server-side in container |
+| Parallel agents | Complex threading | `ThreadPoolExecutor` + independent sessions |
+| Long-running tasks | Timeout risk | No timeout |
+| File system | None | Real container with bash + git |

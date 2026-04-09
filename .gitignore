@@ -1,6 +1,6 @@
 .env
 __pycache__/
 *.pyc
-reports/
+# reports/ is tracked (debate outputs pushed to GitHub)
 *.egg-info/
 .venv/
